@@ -135,7 +135,7 @@ def prepare_data(data):
     for k, v in sorted(data):
         class_ = float(k)
         shared[v] = shared.get(v, set()).union(set([k]))
-    print shared
+    # print shared
     """ Remove duplicate and shared instances. """
     unique_data = {}
     for v, classes in shared.items():
@@ -145,108 +145,6 @@ def prepare_data(data):
 
     return unique_data
         
-
-#
-def prepare_data2(data, dic=None, randomize=None):
-    """
-    *prepare_data(data, dic, randomize=False)*
-    
-    Preprocesses (sequence) data for libSVM experiments.
-    1) Removal of sequences shared by different classes.
-    2) Removal of duplicate sequences.
-    3) Appending of '$' guards for shorter sequences.
-    4) Binary encoding of sequences.
-    5) Optional randomization of data.
-    
-    Arguments:
-       * a data dictionary {seqid: sequence}
-       * an encoding dictionary {char: binary vector}
-       * a randomization flag
-
-    Returns:
-       * a dictionary {class: [sequences]}
-    """
-
-    # shared removal
-    shared = {}
-    for key, seq in sorted(data.items()):
-        ago = float(key.split('_')[0][3])
-        shared[seq] = shared.get(seq, set()).union(set([ago]))
-    
-    # duplicate removal, length measuring
-    lengths = set([])
-    ago_data = {}
-    for seq, ago_set in shared.items():
-        if len(ago_set) == 1: 
-            ago_id = list(ago_set)[0]
-            ago_data[ago_id] = ago_data.get(ago_id, []) + [seq]
-            lengths.add(len(seq))
-    # print ago_data
-
-    """ ATTENTION: no seq-randomize after this point!!! """
-    # encoding
-    maxlen = max(lengths)   
-    if not dic is None:
-    	for key in ago_data:
-        	ago_data[key] = [encode(seq, dic, maxlen) 
-				 for seq in ago_data[key]]
-    # print ago_data
-
-    # optional randomization
-    if randomize is None:
-        pass    
-    elif randomize == 'class-shuffle':
-        x, y = [], []
-        for k, val in ago_data.items():
-            y.extend([k for v in val])
-            x.extend([v for v in val])
-        y_old = [y_ for y_ in y]
-        random.shuffle(y)
-        same_y = sum(map(int, map(lambda x: x[0]==x[1], zip(y_old, y))))
-        print 'Same:', same_y, len(y), same_y/float(len(y))
-
-        ago_data = {}
-        for k, v in zip(y, x):
-            ago_data[k] = ago_data.get(k, []) + [v]
-        # print ago_data
-    elif randomize == 'seq-shuffle':
-        print 'seq-shuffle not implemented'
-        pass
-    elif randomize == 'random-seq':
-        """ 
-        Guess what I'm doing here...seq-randomizing ... 
-        in your face line 168!
-        """
-        if dic is None:
-            keylen = 1
-        else:
-            keylen = len(dic.values()[0])
-        
-        """
-        n_seqs = sum([len(v) for v in ago_data.values()])
-        seqs = n_random_sequences(n_seqs, length=len(ago_data.values()[0][0])/keylen)
-        start = 0        
-        for k in ago_data:
-            end = start + len(ago_data[k])
-            ago_data[k] = [encode(seq, dic, maxlen) for seq in seqs[start:end]]
-            start = end
-        """
-        n_samples = 50
-        n_seqs = n_samples * len(ago_data.keys())
-        seqs = n_random_sequences(n_seqs, length=len(ago_data.values()[0][0])/keylen)
-        random.shuffle(seqs)
-        keys = []
-        for k in ago_data.keys():
-            keys.extend([k for i in xrange(n_samples)])
-        start = 0
-        for k in ago_data.keys():
-            end = start + n_samples
-            ago_data[k] = [encode(seq, dic, maxlen) for seq in seqs[start:end]]
-            start = end
-        
-
-    return ago_data
-
 #
 def n_random_sequences(n, length=10):
     sequences = set()
@@ -275,7 +173,6 @@ def decode(string, dic):
     i = 0
     step = len(dic.keys()[0])
     while i < len(string):
-        # print i, i+step, string[i:i+step]
         decoded += dic[tuple(string[i:i+step])]
         i += step
     return decoded
@@ -346,8 +243,6 @@ def make_set(data, balanced_set=True, training_fraction=0.5):
     """
 
     minsize = min([len(val) for key, val in data.items()])
-    # print data
-    # print minsize
     if balanced_set:
         dataset = balance_data(data, minsize)
     else:

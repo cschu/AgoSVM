@@ -29,7 +29,7 @@ RANDOMIZE_DATA = False
 
 def init(argv):
     global TIMESTAMP
-    timestamp = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())            
+    TIMESTAMP = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())            
     parser = OptionParser()
     parser.add_option('-k', '--kernel', dest='kernel_type')
     parser.add_option('-n', type='int', dest='n_runs')
@@ -62,7 +62,6 @@ def grid_search(y, x, param, grid, cv_func, n, c_range, gamma_range):
 
 ###
 def leave_one_out(y, x, param, n='DUMMY'):
-    # print 'XY', zip(y, x)
     results = []
     for i, test in enumerate(zip(y, x)):
         training_y = y[:i] + y[i+1:]
@@ -72,6 +71,10 @@ def leave_one_out(y, x, param, n='DUMMY'):
         result = svmutil.svm_predict(y[i:i+1], x[i:i+1], model, '-b 1')
         results.append(result + (test[0], make_d.decode(x[i], make_d.decode_dic)))
     return results
+
+###
+def compute_accuracy(results):
+    return sum(map(float, map(lambda x: x[0]==x[1], results)))/len(results)
 
 
 ###
@@ -85,23 +88,9 @@ def main(argv):
     fn = argv[0]
     dataset = make_d.read_data(open(fn))
 
-    # print dataset
-    # print 'X'
     items = dataset.items()
-    keys = [float(x[0].split('_')[0][3]) for x in items]
+    keys = [float(x[0].split('_')[0][3:]) for x in items]
     dataset = zip(keys, [v[1] for v in items])
-    """
-    dataset = {}
-    for k, v in zip(keys, items):
-        dataset[k] = dataset.get(k, []) + [v[1]]
-    """
-    # print dataset
-    
-    """
-    for k1, k2 in zip(keys, dataset.keys()):
-        print k1, k2, k1 == float(k2.split('_')[0][3])
-    return None
-    """
 
     data = make_d.prepare_data(dataset)
     print data.keys(), [len(v) for v in data.values()]
@@ -116,20 +105,33 @@ def main(argv):
     cvfunc = leave_one_out
     n_cv = None
 
+    log_name = '%s-%s-%i-%s.csv' % (TIMESTAMP, 
+                                    KERNEL_TYPE,
+                                    int(RANDOMIZE_DATA),
+                                    #'_vs_'.join(map(str, data.keys())))
+                                    fn.replace('.fas', ''))
+    logfile = open(log_name, 'w')
+                                    
+
     i = 0
     param_grid = {}
     results = []
+    sum_acc = 0
     while i < N_RUNS:
-        print i
+        # print i, 
         sets = make_d.make_set(data, training_fraction=0.75)
         train_y, train_x, test_y, test_x = sets
 
-        print [len(x) for x in sets]
+        # print [len(x) for x in sets]
+        if RANDOMIZE_DATA:
+            random.shuffle(train_y)
+            random.shuffle(test_y)
+            pass
         
         train_x = [make_d.encode(x, make_d.encode_dic) for x in train_x]
         test_x  = [make_d.encode(x, make_d.encode_dic) for x in test_x]
         
-        print len(train_x), len(test_x)
+        # print len(train_x), len(test_x)
         
         param_grid = {}
         param_grid = grid_search(train_y, train_x, param, param_grid,
@@ -139,7 +141,7 @@ def main(argv):
         for k, v in param_grid.items():
             recognized = [v_i[0][0] == v_i[3] for v_i in v]
             recog_rate = sum(map(int, recognized))/float(len(recognized))
-            print k, recog_rate, len(recognized)
+            # print k, recog_rate, len(recognized)
             ranking.append((recog_rate, k))
         ranking.sort()
     
@@ -148,15 +150,26 @@ def main(argv):
         model = svmutil.svm_train(problem, param, '-q')
 
         result = svmutil.svm_predict(test_y, test_x, model, '-b 1')
-        print result
-        print test_y
-        results.extend(zip(result[0], test_y))
+        # print result
+        # print test_y
+        cur_result = zip(result[0], test_y)
+        cur_acc = compute_accuracy(cur_result)
+        
+        results.extend(cur_result)
+        total_acc = compute_accuracy(results)
+
+        sum_acc += cur_acc
+        mean_acc = sum_acc/(i+1)
+        # print cur_acc, mean_acc, total_acc
+
+        logfile.write('%f,%f,%f\n' % (cur_acc, mean_acc, total_acc))
 
         i += 1
         pass
 
-    print 'ACC', sum(map(float, map(lambda x: x[0]==x[1], results)))/len(results)
-
+    print 'ACC', compute_accuracy(results)
+    # sum(map(float, map(lambda x: x[0]==x[1], results)))/len(results)
+    logfile.close()
 
     return None
     print param_grid
@@ -182,3 +195,8 @@ def main(argv):
     return None
 
 if __name__ == '__main__': main(sys.argv[1:])
+
+
+"""
+2011-11-18, 14:27, random label permutation, 3-class, Accuracy: 32.8%
+"""
