@@ -119,7 +119,7 @@ def main(argv):
     log_name = '%s-%s-%i-%s.csv' % (TIMESTAMP, 
                                     KERNEL_TYPE,
                                     int(RANDOMIZE_DATA),
-                                    outfile))
+                                    outfile)
     logfile = open(log_name, 'w')
                                     
 
