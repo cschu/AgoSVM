@@ -103,7 +103,7 @@ def main(argv):
 
     fn_test = argv[1]
     testdata = make_d.read_data(open(fn_test))
-    testitems = test.data.items()
+    testitems = testdata.items()
     testkeys = [0 for x in items]
     testdataset = zip(testkeys, [v[1] for v in testitems])
     testdata = make_d.prepare_data(testdataset)
