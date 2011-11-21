@@ -101,6 +101,12 @@ def n_partition_set(n, setsize):
     return bins
 
 #
+def assign_classes(data):
+    items = data.items()
+    keys = [float(x[0].split('_')[0][3]) for x in items]
+    return zip(keys, [v[1] for v in items])
+
+#
 def read_data(fi):
     """
     *read_data(fi)*
