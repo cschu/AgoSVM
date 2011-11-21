@@ -104,7 +104,7 @@ def main(argv):
     fn_test = argv[1]
     testdata = make_d.read_data(open(fn_test))
     testitems = testdata.items()
-    testkeys = [0 for x in items]
+    testkeys = [float(x[0].split('_')[0][3:]) for x in testitems]
     testdataset = zip(testkeys, [v[1] for v in testitems])
     testdata = make_d.prepare_data(testdataset)
     
@@ -128,7 +128,7 @@ def main(argv):
     results = []
     sum_acc = 0
 
-    sets = make_d.make_set(data, training_fraction=1.0)
+    sets = make_d.make_set(data, balanced_set=False, training_fraction=1.0)
     train_y, train_x, test_y, test_x = sets
     train_x = [make_d.encode(x, make_d.encode_dic) for x in train_x]
     
@@ -150,7 +150,6 @@ def main(argv):
     param.C, param.gamma = map(lambda x: 2**x, ranking[-1][1])
     problem = svm.svm_problem(train_y, train_x)
     model = svmutil.svm_train(problem, param, '-q')
-
     result = svmutil.svm_predict(test_y, test_x, model, '-b 1')
     print result
     
