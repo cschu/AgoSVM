@@ -112,10 +112,14 @@ def main(argv):
     cvfunc = leave_one_out
     n_cv = None
 
+    outfile = os.path.basename(fn)
+    outfile = outfile.replace('.fasta', '')
+    outfile = outfile.replace('.fas', '')
+
     log_name = '%s-%s-%i-%s.csv' % (TIMESTAMP, 
                                     KERNEL_TYPE,
                                     int(RANDOMIZE_DATA),
-                                    fn.replace('.fas', ''))
+                                    outfile))
     logfile = open(log_name, 'w')
                                     
 
