@@ -294,8 +294,20 @@ def write_set(y, x, fo):
         fo.write('%s\n' % ' '.join([str(yx[0])] + row))
     return None
             
-  
-
+###
+def merge_multiclasses(data, set1_members, set2_members):
+    """ 
+    TODO: If set sizes are reasonably large, 
+    do not use the complete smallest set. 
+    """
+    set1 = dict([item for item in data.items() 
+                 if item[0] in set1_members])
+    set2 = dict([item for item in data.items()
+                 if item[0] in set2_members])
+    set1 = make_set(set1, training_fraction=1.0)
+    set2 = make_set(set2, training_fraction=1.0)
+    return {1.0: set1[1], -1.0: set2[1]}
+    
 
 
 ###
