@@ -26,6 +26,8 @@ N_RUNS = 1000
 TIMESTAMP = ''
 KERNEL_TYPE = 'LINEAR'
 RANDOMIZE_DATA = False
+SET1 = None
+SET2 = None
 
 def init(argv):
     global TIMESTAMP
@@ -34,6 +36,8 @@ def init(argv):
     parser.add_option('-k', '--kernel', dest='kernel_type')
     parser.add_option('-n', type='int', dest='n_runs')
     parser.add_option('--random', dest='randomize_data', action='store_true')
+    parser.add_option('--s1', dest='set_1')
+    parser.add_option('--s2', dest='set_2')
     options, args = parser.parse_args(argv)
 
     global KERNEL_TYPE
@@ -45,6 +49,10 @@ def init(argv):
     global N_RUNS
     if options.n_runs is not None:
         N_RUNS = options.n_runs
+    global SET1
+    SET1 = [float(v) for v in options.set_1.split(':')]
+    global SET2
+    SET2 = [float(v) for v in options.set_2.split(':')]
 
     return None
 
@@ -52,12 +60,21 @@ def init(argv):
 def grid_search(y, x, param, grid, cv_func, n, c_range, gamma_range):
     cstart, cend, cstep = c_range
     gstart, gend, gstep = gamma_range
+    t0 = time.clock()
     for c in xrange(cstart, cend + 1, cstep):
         param.C = 2.0 ** c
+        i_gamma = 0
         for gamma in xrange(gstart, gend - 1, gstep):
-            param.gamma = 2.0 ** gamma
+            print 'IGAMMA', i_gamma
+            i_gamma += 1 
+            param.gamma = 2.0 ** gamma # <- Could that be a problem for linear kernel?
             key = (c, gamma)
+            t00 = time.clock()
             grid[key] = grid.get(key, []) + cv_func(y, x, param, n=n)
+            t11 = time.clock()
+            print 'Search took', t11 - t00, 'seconds.'
+    t1 = time.clock()
+    print 'Time:', t1 - t0
     return grid
 
 ###
@@ -67,7 +84,10 @@ def leave_one_out(y, x, param, n='DUMMY'):
         training_y = y[:i] + y[i+1:]
         training_x = x[:i] + x[i+1:]
         problem = svm.svm_problem(training_y, training_x)
+        t0 = time.clock()
         model = svmutil.svm_train(problem, param, '-q')
+        t1 = time.clock()
+        print 'Training took', t1 - t0, 'seconds.'
         result = svmutil.svm_predict(y[i:i+1], x[i:i+1], model, '-b 1')
         results.append(result + (test[0], make_d.decode(x[i], make_d.decode_dic)))
     return results
@@ -82,16 +102,22 @@ def main(argv):
 
     global C_RANGE
     global GAMMA_RANGE
+    global SET1
+    global SET2
+
+    i = 0
+    param_grid = {}
+    results = []
+    sum_acc = 0
 
     init(argv[1:])    
+    print SET1, SET2
+    # return None
 
     fn = argv[0]
     dataset = make_d.read_data(open(fn))
-
-    items = dataset.items()
-    keys = [float(x[0].split('_')[0][3:]) for x in items]
-    dataset = zip(keys, [v[1] for v in items])
-
+    dataset = make_d.assign_classes(dataset)
+    
     data = make_d.prepare_data(dataset)
     print data.keys(), [len(v) for v in data.values()]
 
@@ -105,37 +131,67 @@ def main(argv):
     cvfunc = leave_one_out
     n_cv = None
 
+    use_sets = not SET1 is None and not SET2 is None
+
+    outfile = os.path.basename(fn)
+    outfile = outfile.replace('.fasta', '')
+    outfile = outfile.replace('.fas', '')
+    if use_sets:
+        outfile = ''.join(map(str, map(int, SET1))) + 'vs' + ''.join(map(str, map(int, SET2)))
+
     log_name = '%s-%s-%i-%s.csv' % (TIMESTAMP, 
                                     KERNEL_TYPE,
                                     int(RANDOMIZE_DATA),
-                                    #'_vs_'.join(map(str, data.keys())))
-                                    fn.replace('.fas', ''))
-    logfile = open(log_name, 'w')
-                                    
+                                    outfile)
+    logfile = open(log_name, 'w')                                    
 
-    i = 0
-    param_grid = {}
-    results = []
-    sum_acc = 0
     while i < N_RUNS:
-        # print i, 
-        sets = make_d.make_set(data, training_fraction=0.75)
+        sys.stdout.write('%i ' % i)
+        sys.stdout.flush()
+
+
+        if use_sets:
+            """ TODO: If set sizes are reasonably large, do not use the complete smallest set. """
+            set1 = dict([item for item in data.items() 
+                         if item[0] in SET1])
+            set2 = dict([item for item in data.items()
+                         if item[0] in SET2])
+            set1 = make_d.make_set(set1, training_fraction=1.0)
+            set2 = make_d.make_set(set2, training_fraction=1.0)
+            new_sets = {1.0: set1[1], -1.0: set2[1]}
+            sets = make_d.make_set(new_sets, training_fraction=0.75)
+        else:
+            sets = make_d.make_set(data, training_fraction=0.75)
         train_y, train_x, test_y, test_x = sets
 
-        # print [len(x) for x in sets]
         if RANDOMIZE_DATA:
             random.shuffle(train_y)
             random.shuffle(test_y)
             pass
         
+        print [len(x) for x in sets]
+
         train_x = [make_d.encode(x, make_d.encode_dic) for x in train_x]
         test_x  = [make_d.encode(x, make_d.encode_dic) for x in test_x]
-        
+        # print 'TRAIN', train_x
         # print len(train_x), len(test_x)
+
         
+        """
+        # FOR DEBUGGING
+        make_d.write_set(train_y, train_x, open('set_%04i.dat' % i, 'w'))
+        i += 1
+        if i == N_RUNS: sys.exit(0)
+        continue
+        """
+
+        t0 = time.clock()
         param_grid = {}
+        """ Attention: Calls leave_one_out explicitely!!! """
         param_grid = grid_search(train_y, train_x, param, param_grid,
                                  leave_one_out, n_cv, C_RANGE, GAMMA_RANGE)
+        t1 = time.clock()
+        print 'Time:', t1 - t0, 'Remaining:', (N_RUNS-(i+1)) * (t1 - t0)
 
         ranking = []
         for k, v in param_grid.items():
@@ -160,9 +216,11 @@ def main(argv):
 
         sum_acc += cur_acc
         mean_acc = sum_acc/(i+1)
-        # print cur_acc, mean_acc, total_acc
+        sys.stdout.write('%.5f %.5f %.5f\n' % (cur_acc, mean_acc, total_acc))
+        sys.stdout.flush()
 
         logfile.write('%f,%f,%f\n' % (cur_acc, mean_acc, total_acc))
+        logfile.flush()
 
         i += 1
         pass
@@ -171,28 +229,7 @@ def main(argv):
     # sum(map(float, map(lambda x: x[0]==x[1], results)))/len(results)
     logfile.close()
 
-    return None
-    print param_grid
-    print param_grid.keys()
-    print
-    print param_grid.items()[0]
-
-    ranking = []
-    for k, v in param_grid.items():
-        recognized = [v_i[0][0] == v_i[3] for v_i in v]
-        recog_rate = sum(map(int, recognized))/float(len(recognized))
-        print k, recog_rate, len(recognized)
-        ranking.append((recog_rate, k))
-    ranking.sort()
-    
-    param.C, param.gamma = map(lambda x: 2**x, ranking[-1][1])
-    problem = svm.svm_problem(train_y, train_x)
-    model = svmutil.svm_train(problem, param, '-q')
-
-    result = svmutil.svm_predict(test_y, test_x, model, '-b 1')
-    print result
-    
-    return None
+    return None    
 
 if __name__ == '__main__': main(sys.argv[1:])
 

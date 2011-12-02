@@ -103,7 +103,7 @@ def n_partition_set(n, setsize):
 #
 def assign_classes(data):
     items = data.items()
-    keys = [float(x[0].split('_')[0][3]) for x in items]
+    keys = [float(x[0].split('_')[0][3:]) for x in items]
     return zip(keys, [v[1] for v in items])
 
 #
@@ -139,7 +139,6 @@ def prepare_data(data):
     """ Identify instances that are shared between classes. """
     shared = {}
     for k, v in sorted(data):
-        class_ = float(k)
         shared[v] = shared.get(v, set()).union(set([k]))
     # print shared
     """ Remove duplicate and shared instances. """
@@ -231,9 +230,9 @@ def balance_data(data, minsize):
             balanced[key] = [val[ix] for ix in numbers]
         pass
     return balanced
-
 #
-def make_set(data, balanced_set=True, training_fraction=0.5):
+def make_set(data, balanced_set=True, training_fraction=0.5,
+             set1=None, set2=None):
     """
     *make_set(data, balanced_set=True, training_fraction=0.5)*
 
@@ -247,6 +246,10 @@ def make_set(data, balanced_set=True, training_fraction=0.5):
     Returns:
        * 4 lists: training labels/features, test labels/features
     """
+    if not set1 is None and not set2 is None:
+        new_sets = {1.0: [], -1.0: []}
+        [new_sets[1.0].extend(data[k]) for k in set1]
+        [new_sets[-1.0].extend(data[k]) for k in set2]
 
     minsize = min([len(val) for key, val in data.items()])
     if balanced_set:
@@ -286,8 +289,9 @@ def write_set(y, x, fo):
     """
     
     for yx in zip(y, x):
+        print yx
         row = ['%i:%i' % (i, int(xx)) for i, xx in enumerate(yx[1])]
-        fo.write('%s\n' % ' '.join([str(y)] + row))
+        fo.write('%s\n' % ' '.join([str(yx[0])] + row))
     return None
             
   
