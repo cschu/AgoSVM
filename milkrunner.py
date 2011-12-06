@@ -108,7 +108,7 @@ class MilkRunner(MLRunner):
             i += 1
             pass
         
-        print 'ACC', super(LIBSVMRunner, self).compute_accuracy(recog_rates)
+        print 'ACC', super(MilkRunner, self).compute_accuracy(recog_rates)
         self.stop_logging()
         return None    
 
